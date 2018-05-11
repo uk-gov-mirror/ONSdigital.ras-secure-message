@@ -28,6 +28,46 @@ class ThreadById(Resource):
             messages.append(msg)
         return jsonify({"messages": add_users_and_business_details(messages)})
 
+    def patch(thread_id):
+        """Modify every message in a thread with a status"""
+
+        # TODO, will probably change, but validating upfront (permissions, label, etc) here is
+        # a good idea
+        request_data = request.get_json()
+        action, label = MessageModifyById._validate_request(request_data)
+
+        logger.info("Getting messages from thread", thread_id=thread_id, user_uuid=g.user.user_uuid)
+        conversation = Retriever().retrieve_thread(thread_id, g.user)
+        # Need new function to update them all at once, so we can roll back all at once
+        response = Modifier.add_label_to_all_messages_in_thread(conversation, user, action, label)
+
+        if resp:
+            logger.info("Thread label update successful", thread_id=thread_id, user_uuid=g.user.user_uuid)
+            return ('', 204)
+        else:
+            logger.error('Error updating message', msg_id=message_id, status_code=400)
+            abort(400)
+        return res
+
+    @staticmethod
+    def _validate_request(request_data):
+        """Used to validate data within request body for ModifyById"""
+        if not g.user.is_internal:
+            logger.info("Thread modification is forbidden")
+            abort(403)
+        if 'label' not in request_data:
+            logger.error('No label provided')
+            raise BadRequest(description="No label provided")
+        if request_data['label'] not in ['CLOSED']:
+            logger.error('Invalid label provided')
+            raise BadRequest(description="Invalid label provided")
+        if 'action' not in request_data:
+            logger.error('No action provided')
+            raise BadRequest(description="No action provided")
+        if request_data['action'] not in ['ADD', 'REMOVE']:
+            logger.error('Invalid action provided')
+            raise BadRequest(description="Invalid action provided")
+
 
 class ThreadList(Resource):
     """Return a list of threads for the user"""
