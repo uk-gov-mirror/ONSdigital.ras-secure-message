@@ -31,6 +31,34 @@ class Modifier:
         return actor
 
     @staticmethod
+    def modify_label_for_all_messages_in_thread(conversation, user, action, label, session=db.session):
+        """modify label for all messages in thread in status table"""
+        actor = Modifier._get_label_actor(user=user, message=message)
+
+        if action == 'ADD':
+            try:
+                for message in conversation.all():
+                    status = Status(label=label, msg_id=message['msg_id'], actor=actor)
+                    session.add(status)
+                session.commit()
+                return True
+            except Exception as e:
+                session.rollback()
+                logger.error('Error adding label to database', msg_id=message, label=label, user_uuid=actor, error=e)
+                raise InternalServerError(description="Error adding label to database")
+        if action == 'REMOVE':
+            try:
+                for message in conversation.all():
+                    status = Status(label=label, msg_id=message['msg_id'], actor=actor)
+                    session.expunge(status)
+                session.commit()
+                return True
+            except Exception as e:
+                session.rollback()
+                logger.error('Error removing label from database', msg_id=message, label=label, user_uuid=actor, error=e)
+                raise InternalServerError(description="Error removing label from database")
+
+    @staticmethod
     def add_label(label, message, user, session=db.session):
         """add a label to status table"""
         actor = Modifier._get_label_actor(user=user, message=message)

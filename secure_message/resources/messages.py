@@ -39,6 +39,12 @@ class MessageSend(Resource):
         message = self._validate_post_data(post_data)
 
         if message.errors == {}:
+            #if message.data.thread_id:
+                # conversation = Retriever().retrieve_thread(message.data.thread_id, g.user)
+                # is_thread_closed = Check that none of the messages have the CLOSED label
+                # if is_thread_closed:
+                    #return jsonify({'message': 'Cannot add reply to a closed thread'), 400
+
             self._message_save(message)
             # listener errors are logged but still a 201 reported
             MessageSend._alert_listeners(message.data)
