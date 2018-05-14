@@ -52,7 +52,7 @@ class MessageSend(Resource):
                         break
 
                 if is_thread_closed:
-                    return jsonify({'message': 'Cannot add reply to a closed thread'), 400
+                    return jsonify({'message': 'Cannot add reply to a closed thread'}), 400
 
             self._message_save(message)
             # listener errors are logged but still a 201 reported
