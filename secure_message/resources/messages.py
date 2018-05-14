@@ -39,11 +39,20 @@ class MessageSend(Resource):
         message = self._validate_post_data(post_data)
 
         if message.errors == {}:
-            #if message.data.thread_id:
-                # conversation = Retriever().retrieve_thread(message.data.thread_id, g.user)
-                # is_thread_closed = Check that none of the messages have the CLOSED label
-                # if is_thread_closed:
-                    #return jsonify({'message': 'Cannot add reply to a closed thread'), 400
+            # If message is in a thread, we need to make sure it hasn't been closed already.
+            if message.data.thread_id:
+                conversation = Retriever().retrieve_thread(message.data.thread_id, g.user)
+                is_thread_closed = False
+                # Seems like a longhand way to do this, but serialize sorts out the Labels
+                for message in conversation.all():
+                    msg = message.serialize(g.user, body_summary=False)
+                    messages.append(msg)
+                    if 'CLOSED' in msg['labels']:
+                        is_thread_closed = True
+                        break
+
+                if is_thread_closed:
+                    return jsonify({'message': 'Cannot add reply to a closed thread'), 400
 
             self._message_save(message)
             # listener errors are logged but still a 201 reported
