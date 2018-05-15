@@ -6,6 +6,7 @@ class Labels(Enum):
 
     INBOX = "INBOX"
     UNREAD = "UNREAD"
+    CLOSED = "CLOSED"
     SENT = "SENT"
 
-    label_list = [INBOX, UNREAD, SENT]
+    label_list = [INBOX, UNREAD, CLOSED, SENT]

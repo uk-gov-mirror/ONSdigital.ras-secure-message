@@ -1,12 +1,14 @@
 import logging
 
-from flask import g, jsonify, request
+from flask import abort, g, jsonify, request
 from flask_restful import Resource
 from structlog import wrap_logger
+from werkzeug.exceptions import BadRequest
 
 from secure_message.common.utilities import get_options, process_paginated_list, add_users_and_business_details
 from secure_message.constants import THREAD_LIST_ENDPOINT
 from secure_message.repository.retriever import Retriever
+from secure_message.repository.modifier import Modifier
 
 logger = wrap_logger(logging.getLogger(__name__))
 
@@ -28,26 +30,33 @@ class ThreadById(Resource):
             messages.append(msg)
         return jsonify({"messages": add_users_and_business_details(messages)})
 
+    @staticmethod
     def patch(thread_id):
         """Modify every message in a thread with a status"""
 
-        # TODO, will probably change, but validating upfront (permissions, label, etc) here is
-        # a good idea
         request_data = request.get_json()
-        action, label = MessageModifyById._validate_request(request_data)
+        logger.info(request_data)
+        msg_property, value = ThreadById._validate_request(request_data)
 
         logger.info("Getting messages from thread", thread_id=thread_id, user_uuid=g.user.user_uuid)
         conversation = Retriever().retrieve_thread(thread_id, g.user)
-        # Need new function to update them all at once, so we can roll back all at once
-        response = Modifier.add_label_to_all_messages_in_thread(conversation, user, action, label)
+        message = conversation.first().serialize(g.user, body_summary=False)
+        success = False
+        if msg_property == 'is_closed':
+            if 'CLOSED' in message['labels']:
+                logger.info("Already closed")
+                abort(400)
+            if value is True:
+                success = Modifier.add_label(message, 'CLOSED', g.user)
+            else:
+                success = Modifier.remove_label(message, 'CLOSED', g.user)
 
-        if resp:
+        if success:
             logger.info("Thread label update successful", thread_id=thread_id, user_uuid=g.user.user_uuid)
             return ('', 204)
         else:
-            logger.error('Error updating message', msg_id=message_id, status_code=400)
-            abort(400)
-        return res
+            logger.error('Error updating message', thread_id=thread_id, status_code=400)
+            raise BadRequest(description="Error updating message")
 
     @staticmethod
     def _validate_request(request_data):
@@ -55,18 +64,15 @@ class ThreadById(Resource):
         if not g.user.is_internal:
             logger.info("Thread modification is forbidden")
             abort(403)
-        if 'label' not in request_data:
-            logger.error('No label provided')
-            raise BadRequest(description="No label provided")
-        if request_data['label'] not in ['CLOSED']:
-            logger.error('Invalid label provided')
+        # Check if it's empty
+        if not request_data:
+            logger.error('No properties provided')
+            raise BadRequest(description="No properties provided")
+        if isinstance(request_data['is_closed'], bool):
+            logger.error('Invalid value provided')
             raise BadRequest(description="Invalid label provided")
-        if 'action' not in request_data:
-            logger.error('No action provided')
-            raise BadRequest(description="No action provided")
-        if request_data['action'] not in ['ADD', 'REMOVE']:
-            logger.error('Invalid action provided')
-            raise BadRequest(description="Invalid action provided")
+
+        return 'is_closed', request_data['is_closed']
 
 
 class ThreadList(Resource):
