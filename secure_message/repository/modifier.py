@@ -33,6 +33,7 @@ class Modifier:
     @staticmethod
     def add_label(label, message, user, session=db.session):
         """add a label to status table"""
+        logger.info(message)
         actor = Modifier._get_label_actor(user=user, message=message)
 
         try:

@@ -1,4 +1,5 @@
 import logging
+from distutils.util import strtobool
 
 from flask import abort, g, jsonify, request
 from flask_restful import Resource
@@ -34,26 +35,29 @@ class ThreadById(Resource):
     def patch(thread_id):
         """Modify every message in a thread with a status"""
 
-        request_data = request.get_json()
-        logger.info(request_data)
+        logger.info("Going to patch", thread_id=thread_id, user_uuid=g.user.user_uuid)
+        request_data = request.form
         msg_property, value = ThreadById._validate_request(request_data)
 
         logger.info("Getting messages from thread", thread_id=thread_id, user_uuid=g.user.user_uuid)
         conversation = Retriever().retrieve_thread(thread_id, g.user)
         message = conversation.first().serialize(g.user, body_summary=False)
+        logger.info(message)
         success = False
         if msg_property == 'is_closed':
-            if 'CLOSED' in message['labels']:
-                logger.info("Already closed")
-                abort(400)
-            if value is True:
-                success = Modifier.add_label(message, 'CLOSED', g.user)
+            if value:
+                if 'CLOSED' in message['labels']:
+                    logger.info("Already closed")
+                    abort(400)
+                logger.info("About to add label")
+                success = Modifier.add_label('CLOSED',message, g.user)
             else:
-                success = Modifier.remove_label(message, 'CLOSED', g.user)
+                logger.info("About to remove label")
+                success = Modifier.remove_label('CLOSED', message, g.user)
 
         if success:
             logger.info("Thread label update successful", thread_id=thread_id, user_uuid=g.user.user_uuid)
-            return ('', 204)
+            return '', 204
         else:
             logger.error('Error updating message', thread_id=thread_id, status_code=400)
             raise BadRequest(description="Error updating message")
@@ -68,11 +72,11 @@ class ThreadById(Resource):
         if not request_data:
             logger.error('No properties provided')
             raise BadRequest(description="No properties provided")
-        if isinstance(request_data['is_closed'], bool):
+        if request_data['is_closed'] not in ['True', 'False']:
             logger.error('Invalid value provided')
             raise BadRequest(description="Invalid label provided")
 
-        return 'is_closed', request_data['is_closed']
+        return 'is_closed', strtobool(request_data['is_closed'])
 
 
 class ThreadList(Resource):
