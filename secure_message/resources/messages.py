@@ -40,11 +40,10 @@ class MessageSend(Resource):
 
         if message.errors == {}:
             # If message is in a thread, we need to make sure it hasn't been closed already.
-            logger.info(message.data)
             if message.data.thread_id != message.data.msg_id:
                 conversation = Retriever().retrieve_thread(message.data.thread_id, g.user)
-                message = conversation.first().serialize(g.user, body_summary=False)
-                if 'CLOSED' in message['labels']:
+                serialised_message = conversation.first().serialize(g.user, body_summary=False)
+                if 'CLOSED' in serialised_message['labels']:
                     return jsonify({'message': 'Cannot add reply to a closed thread'}), 400
             self._message_save(message)
             # listener errors are logged but still a 201 reported

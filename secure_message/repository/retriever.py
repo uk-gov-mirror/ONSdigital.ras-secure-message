@@ -155,17 +155,24 @@ class Retriever:
                                  .label('max_id')) \
                 .join(Events).join(Status) \
                 .filter(or_(and_(SecureMessage.from_internal.is_(False), Status.label == Labels.INBOX.value),  # NOQA
-                            and_(SecureMessage.from_internal.is_(True),
-                                 Status.label.in_([Labels.SENT.value]))
+                            and_(SecureMessage.from_internal.is_(True), Status.label.in_([Labels.SENT.value]))
                            )
                        ) \
                 .group_by(SecureMessage.thread_id).subquery('t')
 
+            # TODO: need to check request_args for is_closed, and apply this filter accordingly
+            u = db.session.query(SecureMessage.thread_id).join(Status) \
+            .filter(Status.label == Labels.CLOSED.value).subquery('u')
+
+            conditions.append(~SecureMessage.thread_id.in_(u))
+
             conditions.append(SecureMessage.thread_id == t.c.thread_id)
             conditions.append(SecureMessage.id == t.c.max_id)
 
+
             result = SecureMessage.query.filter(and_(*conditions)) \
                 .order_by(t.c.max_id.desc()).paginate(request_args.page, request_args.limit, False)
+
 
         except SQLAlchemyError:
             logger.exception('Error retrieving messages from database')
