@@ -160,11 +160,13 @@ class Retriever:
                        ) \
                 .group_by(SecureMessage.thread_id).subquery('t')
 
-            # TODO: need to check request_args for is_closed, and apply this filter accordingly
             u = db.session.query(SecureMessage.thread_id).join(Status) \
                 .filter(Status.label == Labels.CLOSED.value).subquery('u')
 
-            conditions.append(~SecureMessage.thread_id.in_(u))
+            if request_args.label == 'CLOSED':
+                conditions.append(SecureMessage.thread_id.in_(u))
+            else:
+                conditions.append(~SecureMessage.thread_id.in_(u))
 
             conditions.append(SecureMessage.thread_id == t.c.thread_id)
             conditions.append(SecureMessage.id == t.c.max_id)
