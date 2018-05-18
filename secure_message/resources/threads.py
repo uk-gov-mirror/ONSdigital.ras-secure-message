@@ -50,7 +50,7 @@ class ThreadById(Resource):
                     logger.info("Already closed")
                     abort(400)
                 logger.info("About to add label")
-                success = Modifier.add_label('CLOSED',message, g.user)
+                success = Modifier.add_label('CLOSED', message, g.user)
             else:
                 logger.info("About to remove label")
                 success = Modifier.remove_label('CLOSED', message, g.user)

@@ -162,17 +162,15 @@ class Retriever:
 
             # TODO: need to check request_args for is_closed, and apply this filter accordingly
             u = db.session.query(SecureMessage.thread_id).join(Status) \
-            .filter(Status.label == Labels.CLOSED.value).subquery('u')
+                .filter(Status.label == Labels.CLOSED.value).subquery('u')
 
             conditions.append(~SecureMessage.thread_id.in_(u))
 
             conditions.append(SecureMessage.thread_id == t.c.thread_id)
             conditions.append(SecureMessage.id == t.c.max_id)
 
-
             result = SecureMessage.query.filter(and_(*conditions)) \
                 .order_by(t.c.max_id.desc()).paginate(request_args.page, request_args.limit, False)
-
 
         except SQLAlchemyError:
             logger.exception('Error retrieving messages from database')
