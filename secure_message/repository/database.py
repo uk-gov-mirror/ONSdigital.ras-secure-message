@@ -30,14 +30,15 @@ class SecureMessage(db.Model):
     collection_exercise = Column("collection_exercise", String(constants.MAX_COLLECTION_EXERCISE_LEN + 1))
     survey = Column("survey", String(constants.MAX_SURVEY_LEN + 1))
     from_internal = Column('from_internal', Boolean())
+    event = Column('event', String(constants.MAX_EVENT_LEN + 1))
+    date_time = Column('date_time', DateTime())
 
     statuses = relationship('Status', backref='secure_message', lazy="dynamic")
-    events = relationship('Events', backref='secure_message', order_by='Events.date_time', lazy="dynamic")
 
     __table_args__ = (Index("idx_ru_survey_cc", "ru_id", "survey", "collection_case", "collection_exercise"), )
 
     def __init__(self, msg_id="", subject="", body="", thread_id="", collection_case='',
-                 ru_id='', survey='', collection_exercise='', from_internal=False):
+                 ru_id='', survey='', collection_exercise='', from_internal=False, event=''):
 
         logger.debug(f"Initialised Secure Message entity: msg_id: {id}")
         self.msg_id = msg_id
@@ -49,6 +50,8 @@ class SecureMessage(db.Model):
         self.survey = survey
         self.collection_exercise = collection_exercise
         self.from_internal = from_internal
+        self.event = event
+        self.date_time = datetime.now(timezone.utc)
 
     def set_from_domain_model(self, domain_model):
         """set dbMessage attributes to domain_model attributes"""
@@ -75,6 +78,8 @@ class SecureMessage(db.Model):
                    'survey': self.survey,
                    'collection_exercise': self.collection_exercise,
                    'from_internal': self.from_internal,
+                   'event': self.event,
+                   'date_time': self.date_time,
                    '_links': '',
                    'labels': []}
 
@@ -118,11 +123,10 @@ class SecureMessage(db.Model):
             message['msg_from'] = row.actor
 
     def _populate_events(self, message):
-        for row in self.events:
-            if row.event == EventsApi.SENT.value:
-                message['sent_date'] = str(row.date_time)
-            elif row.event == EventsApi.READ.value:
-                message['read_date'] = str(row.date_time)
+            if message.event == EventsApi.SENT.value:
+                message['sent_date'] = str(message.date_time)
+            elif message.event == EventsApi.READ.value:
+                message['read_date'] = str(message.date_time)
 
 
 class Status(db.Model):
@@ -153,19 +157,3 @@ class Status(db.Model):
                 'label': self.label}
 
         return data
-
-
-class Events(db.Model):
-    """Events table model"""
-    __tablename__ = "events"
-
-    id = Column('id', Integer(), primary_key=True)
-    event = Column('event', String(constants.MAX_EVENT_LEN + 1))
-    msg_id = Column('msg_id', String(constants.MAX_MSG_ID_LEN + 1), ForeignKey('secure_message.msg_id'), index=True)
-    date_time = Column('date_time', DateTime())
-    __table_args__ = (Index("idx_msg_id_event", "msg_id", "event"),)
-
-    def __init__(self, msg_id='', event=''):
-        self.msg_id = msg_id
-        self.event = event
-        self.date_time = datetime.now(timezone.utc)
