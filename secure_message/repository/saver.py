@@ -38,16 +38,3 @@ class Saver:
             session.rollback()
             logger.exception('Message status save failed')
             raise MessageSaveException('Message save failed')
-
-    @staticmethod
-    def save_msg_event(msg_id, event, session=db.session):
-        """save message events to events database"""
-        event = Events(msg_id=msg_id, event=event)
-
-        try:
-            session.add(event)
-            session.commit()
-        except SQLAlchemyError:
-            session.rollback()
-            logger.exception('Message event save failed')
-            raise MessageSaveException('Message save failed')

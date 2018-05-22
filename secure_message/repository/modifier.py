@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import logging
 
 from flask import jsonify
+from sqlalchemy.exc import SQLAlchemyError
 from structlog import wrap_logger
 from werkzeug.exceptions import InternalServerError
 
@@ -79,9 +80,14 @@ class Modifier:
         """Remove unread label from status"""
         inbox = Labels.INBOX.value
         unread = Labels.UNREAD.value
-        if inbox in message['labels'] and unread in message['labels'] and 'read_date' not in message:
-            result = SecureMessage.query.join(Status).filter(SecureMessage.msg_id == message['msg_id'])
-            result.read_datetime = datetime.now(timezone.utc)
-            session.commit()
+        if inbox in message['labels'] and unread in message['labels']:
+            try:
+                result = SecureMessage.query.filter(SecureMessage.msg_id == message['msg_id'])
+                result.one().read_datetime = datetime.now(timezone.utc)
+                session.commit()
+            except SQLAlchemyError:
+                session.rollback()
+                logger.exception('Error adding read_datetime to message', msg_id=message['msg_id'])
+                raise InternalServerError(description="Error adding read_datetime to message")
         Modifier.remove_label(unread, message, user)
         return True
