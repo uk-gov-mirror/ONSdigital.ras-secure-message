@@ -1,13 +1,12 @@
+from datetime import datetime, timezone
 import logging
 
 from flask import jsonify
 from structlog import wrap_logger
 from werkzeug.exceptions import InternalServerError
 
-from secure_message.common.eventsapi import EventsApi
 from secure_message.common.labels import Labels
-from secure_message.repository.database import db, Status
-from secure_message.repository.saver import Saver
+from secure_message.repository.database import db, Status, SecureMessage
 
 logger = wrap_logger(logging.getLogger(__name__))
 
@@ -76,11 +75,13 @@ class Modifier:
         return res
 
     @staticmethod
-    def del_unread(message, user):
+    def del_unread(message, user, session=db.session):
         """Remove unread label from status"""
         inbox = Labels.INBOX.value
         unread = Labels.UNREAD.value
         if inbox in message['labels'] and unread in message['labels'] and 'read_date' not in message:
-            Saver().save_msg_event(message['msg_id'], EventsApi.READ.value)
+            result = SecureMessage.query.join(Status).filter(SecureMessage.msg_id == message['msg_id'])
+            result.read_datetime = datetime.now(timezone.utc)
+            session.commit()
         Modifier.remove_label(unread, message, user)
         return True

@@ -6,7 +6,6 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Boolean, Column, String, Integer, DateTime, ForeignKey, Index, MetaData
 from sqlalchemy.orm import relationship
 from secure_message import constants
-from secure_message.common.eventsapi import EventsApi
 from secure_message.common.labels import Labels
 
 logger = wrap_logger(logging.getLogger(__name__))
@@ -30,15 +29,15 @@ class SecureMessage(db.Model):
     collection_exercise = Column("collection_exercise", String(constants.MAX_COLLECTION_EXERCISE_LEN + 1))
     survey = Column("survey", String(constants.MAX_SURVEY_LEN + 1))
     from_internal = Column('from_internal', Boolean())
-    event = Column('event', String(constants.MAX_EVENT_LEN + 1))
-    date_time = Column('date_time', DateTime())
+    sent_datetime = Column('sent_datetime', DateTime())
+    read_datetime = Column('read_datetime', DateTime())
 
     statuses = relationship('Status', backref='secure_message', lazy="dynamic")
 
     __table_args__ = (Index("idx_ru_survey_cc", "ru_id", "survey", "collection_case", "collection_exercise"), )
 
     def __init__(self, msg_id="", subject="", body="", thread_id="", collection_case='',
-                 ru_id='', survey='', collection_exercise='', from_internal=False, event=''):
+                 ru_id='', survey='', collection_exercise='', from_internal=False, read_datetime=''):
 
         logger.debug(f"Initialised Secure Message entity: msg_id: {id}")
         self.msg_id = msg_id
@@ -50,8 +49,8 @@ class SecureMessage(db.Model):
         self.survey = survey
         self.collection_exercise = collection_exercise
         self.from_internal = from_internal
-        self.event = event
-        self.date_time = datetime.now(timezone.utc)
+        self.sent_datetime = datetime.now(timezone.utc)
+        self.read_datetime = read_datetime
 
     def set_from_domain_model(self, domain_model):
         """set dbMessage attributes to domain_model attributes"""
@@ -67,6 +66,8 @@ class SecureMessage(db.Model):
 
     def serialize(self, user, body_summary=False):
         """Return object data in easily serializeable format"""
+
+        # TODO Change sent_date and read_date to sent_datetime instead
         message = {'msg_to': [],
                    'msg_from': '',
                    'msg_id': self.msg_id,
@@ -78,8 +79,8 @@ class SecureMessage(db.Model):
                    'survey': self.survey,
                    'collection_exercise': self.collection_exercise,
                    'from_internal': self.from_internal,
-                   'event': self.event,
-                   'date_time': self.date_time,
+                   'sent_date': self.sent_datetime,
+                   'read_date': self.read_datetime,
                    '_links': '',
                    'labels': []}
 
@@ -87,8 +88,6 @@ class SecureMessage(db.Model):
             self._populate_to_from_and_labels_internal_user(message)
         else:
             self._populate_to_from_and_labels_respondent(user, message)
-
-        self._populate_events(message)
 
         return message
 
@@ -121,12 +120,6 @@ class SecureMessage(db.Model):
             message['msg_to'].append(row.actor)
         elif row.label == Labels.SENT.value:
             message['msg_from'] = row.actor
-
-    def _populate_events(self, message):
-            if message.event == EventsApi.SENT.value:
-                message['sent_date'] = str(message.date_time)
-            elif message.event == EventsApi.READ.value:
-                message['read_date'] = str(message.date_time)
 
 
 class Status(db.Model):
